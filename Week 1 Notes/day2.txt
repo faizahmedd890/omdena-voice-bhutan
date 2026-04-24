@@ -4,7 +4,6 @@ We created a separate Team 3 GitHub repository
 We added all team members to the repository
 We created the project structure shown below:
 omdena-team3-prototype/
- ├── tool_comparison.md
  ├── chatbot.py
  ├── requirements.txt
 Tool Comparison We Documented
