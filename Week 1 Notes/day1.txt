@@ -1,0 +1,40 @@
+Architecture Plan — Team 03 (Day 1)
+
+Purpose
+Today we focused on planning how our chatbot prototype will be structured before starting any coding.
+
+Planned System Architecture
+Our chatbot system will follow this flow:
+
+User
+↓
+Mistral Ai
+↓
+Streamlit Chat Interface (UI)
+↓
+Response shown back to the user in Streamlit
+
+Explanation of Each Part
+1. User
+The user types a message in the chat interface.
+
+
+2. Mistral Ai
+This will generate responses to the user’s messages.
+
+3. Streamlit UI
+This is the chat screen where the user interacts with the assistant.
+
+4. Response
+The generated response will be displayed back to the user in the chat UI.
+
+Why This Planning is Important
+We are not writing code on Day 1.
+We are understanding how the system should work so that development becomes easier in the next days.
+
+Learning Outcome
+By doing this planning, we understand:
+
+Basic chatbot system design
+How user input becomes AI response
+How to prepare for building the prototype in the next steps.
