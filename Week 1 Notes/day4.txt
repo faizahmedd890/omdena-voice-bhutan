@@ -1,8 +1,8 @@
 Day 4 — Combined UI + OpenAI (Very Simple)
 What We Did
-We connected the Streamlit chat input to the OpenAI API.
+We connected the Streamlit chat input to the Mastral API.
 The flow was:
-Streamlit input → OpenAI → response shown in the UI
+Streamlit input → Mastral Ai → response shown in the UI
 We did not add any conversation flows, prompts, or classifier logic at this stage.
 The goal was only to prove that the UI and LLM connection worked correctly.
 We created a document to record this setup and our observations.
