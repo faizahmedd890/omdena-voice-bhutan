@@ -1,1 +1,0 @@
-# omdena-voice-bhutan
