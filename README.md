@@ -18,12 +18,9 @@ LangChain
 Mistral AI API
 python-dotenv
 Project Structure
-omdena-team3-prototype/
+code/
  ├── chatbot.py
  ├── requirements.txt
- ├── tool_comparison.md
- ├── architecture.md
- ├── team_log.md
  └── README.md
 How to Run the Project
 1. Install requirements
