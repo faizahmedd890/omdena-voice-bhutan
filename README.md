@@ -37,13 +37,3 @@ The current version is a **Streamlit-based chatbot** that:
 ├── app.py # Main Streamlit application
 ├── README.md # Project documentation
 
-
----
-
-## ⚙️ Setup Instructions
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/faizahmedd890/omdena-voice-bhutan.git
-cd omdena-voice-bhutan
