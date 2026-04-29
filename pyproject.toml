@@ -1,0 +1,13 @@
+[project]
+name = "omdena-public-service-assistant"
+version = "0.2.0"
+description = "Voice and chat prototype for public service guidance"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
