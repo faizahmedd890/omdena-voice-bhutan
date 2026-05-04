@@ -1,9 +1,0 @@
-Day 5 — Documentation Day (Very Important KPI)
-What We Did
-We updated Week 1 Notes with a short record of what we did each day.
-We completed README.md with clear steps on how to run the app.
-We finalized architecture.md with the planned system design.
-We pushed all files and updates to our Team 3 GitHub repository.
-Why This Was Important
-
-This documentation will be used directly in the final Feasibility Report, so we made sure everything was clear, complete, and well organized.
