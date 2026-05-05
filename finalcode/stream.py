@@ -1,17 +1,15 @@
 # =============================================================================
 # Bhutan Business Registration Chatbot
 # Voice + Text | RAG | Dzongkha/English | Workflow + Controller
-# FIXED REAL MICROPHONE VOICE VERSION
+# CLEAN MIC UI VERSION (No WebRTC)
 # =============================================================================
 
 import os
 import uuid
 import tempfile
-import numpy as np
+import logging
 import whisper
 import streamlit as st
-import av
-import soundfile as sf
 
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
@@ -20,9 +18,12 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
-
 from langchain_community.document_loaders import PyPDFLoader
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+
+from streamlit_mic_recorder import mic_recorder
+
+# Silence transformers noise if any
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 load_dotenv()
 
@@ -69,22 +70,21 @@ def load_rag():
     ])
 
     chain = prompt | llm
-    return embeddings, vectordb, retriever, chain
+    return vectordb, retriever, chain
 
 whisper_model = load_whisper()
-embeddings, vectordb, retriever, chain = load_rag()
+vectordb, retriever, chain = load_rag()
 
 # =============================================================================
-# STATE
+# SESSION STATE
 # =============================================================================
 
 if "state" not in st.session_state:
     st.session_state.state = {
-        "session_id": f"BHU-{uuid.uuid4().hex[:8].upper()}",
         "history": [],
-        "slots": {"is_citizen": None, "business_type": None, "location": None},
         "mode": "normal",
-        "step": 0
+        "step": 0,
+        "slots": {}
     }
 
 state = st.session_state.state
@@ -96,57 +96,47 @@ state = st.session_state.state
 def add(role, text):
     state["history"].append({"role": role, "text": text})
 
-def format_history():
+def history_text():
     return "\n".join(
-        f"{'User' if m['role']=='user' else 'Assistant'}: {m['text']}"
-        for m in state["history"][-12:]
+        f"{m['role']}: {m['text']}"
+        for m in state["history"][-10:]
     )
+
+def retrieve_context(q):
+    docs = retriever.invoke(q)
+    return "\n\n".join(d.page_content for d in docs)
+
+def rag_answer(q):
+    add("User", q)
+    res = chain.invoke({
+        "context": retrieve_context(q),
+        "history": history_text(),
+        "question": q
+    })
+    ans = res.content.strip()
+    add("Assistant", ans)
+    return ans
 
 def translate(text, dz):
     if dz:
         return GoogleTranslator(source="auto", target="en").translate(text)
     return text
 
-def detect_citizenship(text):
-    t = text.lower()
-    return any(x in t for x in ["bhutanese", "citizen", "yes", "i am bhutanese"])
-
-def retrieve_context(q):
-    docs = retriever.invoke(q)
-    return "\n\n".join(d.page_content for d in docs)
-
-def rag_answer(question):
-    add("User", question)
-
-    context = retrieve_context(question)
-    history = format_history()
-
-    res = chain.invoke({
-        "context": context,
-        "history": history,
-        "question": question
-    })
-
-    ans = res.content.strip()
-    add("Assistant", ans)
-    return ans
-
 # =============================================================================
 # WORKFLOW
 # =============================================================================
 
-def workflow(user_text):
-    t = user_text.lower()
+def workflow(text):
+    t = text.lower()
 
     if state["step"] == 1:
-        if detect_citizenship(user_text):
-            state["slots"]["is_citizen"] = True
+        if "yes" in t or "bhutanese" in t:
             state["step"] = 2
-            return "Step 2/5: Please tell your age."
+            return "Step 2/5: Your age?"
         return "Step 1/5: Are you a Bhutanese citizen?"
 
     if state["step"] == 2:
-        digits = "".join(c for c in user_text if c.isdigit())
+        digits = "".join(c for c in t if c.isdigit())
         if digits and int(digits) >= 18:
             state["step"] = 3
             return "Step 3/5: Registration / Renewal / Tax help?"
@@ -154,76 +144,45 @@ def workflow(user_text):
 
     if state["step"] == 3:
         state["step"] = 4
-        return "Step 4/5: What type of business?"
+        return "Step 4/5: Business type?"
 
     if state["step"] == 4:
-        state["slots"]["business_type"] = user_text
+        state["slots"]["type"] = text
         state["step"] = 5
         return "Step 5/5: Location in Bhutan?"
 
     if state["step"] == 5:
-        state["slots"]["location"] = user_text
-        state["step"] = 0
+        state["slots"]["loc"] = text
         state["mode"] = "normal"
-
-        q = f"How to register {state['slots']['business_type']} in {state['slots']['location']} Bhutan"
+        state["step"] = 0
+        q = f"How to register {state['slots']['type']} in {state['slots']['loc']} Bhutan"
         return rag_answer(q)
 
 # =============================================================================
 # CONTROLLER
 # =============================================================================
 
-def controller(user_text):
-    t = user_text.lower()
+def controller(text):
+    t = text.lower()
 
     if t == "restart":
         st.session_state.state = {
-            "session_id": f"BHU-{uuid.uuid4().hex[:8].upper()}",
             "history": [],
-            "slots": {},
             "mode": "normal",
-            "step": 0
+            "step": 0,
+            "slots": {}
         }
         return "Session restarted."
 
     if state["mode"] == "workflow":
-        return workflow(user_text)
+        return workflow(text)
 
-    if any(w in t for w in ["start", "register"]):
+    if "register" in t or "start" in t:
         state["mode"] = "workflow"
         state["step"] = 1
         return "Step 1/5: Are you a Bhutanese citizen?"
 
-    return rag_answer(user_text)
-
-# =============================================================================
-# PDF INGEST
-# =============================================================================
-
-def ingest_pdf(file):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(file.read())
-        tmp_path = tmp.name
-
-    loader = PyPDFLoader(tmp_path)
-    docs = loader.load()
-
-    vectordb.add_documents(docs)
-    vectordb.persist()
-
-    return "PDF added to knowledge base!"
-
-# =============================================================================
-# AUDIO PROCESSOR (REAL MIC)
-# =============================================================================
-
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.frames = []
-
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        self.frames.append(frame.to_ndarray())
-        return frame
+    return rag_answer(text)
 
 # =============================================================================
 # UI
@@ -236,43 +195,28 @@ dz = lang == "Dzongkha"
 
 mode = st.radio("Input Mode", ["Text", "Voice"])
 
-pdf = st.file_uploader("Upload PDF (optional)", type=["pdf"])
-if pdf:
-    st.success(ingest_pdf(pdf))
-
 st.divider()
-
-# =============================================================================
-# INPUT LOGIC
-# =============================================================================
 
 user_input = ""
 
-# ---------------- TEXT MODE ----------------
+# ---------------- TEXT ----------------
 if mode == "Text":
     user_input = st.text_input("Type your message")
 
-# ---------------- VOICE MODE (FIXED) ----------------
+# ---------------- VOICE (CLEAN) ----------------
 else:
-    st.write("🎤 Click START and speak")
+    st.write("🎤 Speak")
+    audio = mic_recorder(start_prompt="Start Recording",
+                         stop_prompt="Stop Recording",
+                         key="mic")
 
-    ctx = webrtc_streamer(
-        key="voice-input",
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={"audio": True, "video": False},
-    )
-
-    if ctx.audio_processor and len(ctx.audio_processor.frames) > 0:
-
-        audio_data = np.concatenate(ctx.audio_processor.frames, axis=1)
-
+    if audio:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            sf.write(f.name, audio_data.T, 16000)
-            audio_path = f.name
+            f.write(audio["bytes"])
+            path = f.name
 
-        result = whisper_model.transcribe(audio_path)
+        result = whisper_model.transcribe(path)
         user_input = result["text"]
-
         st.success("🗣️ You said: " + user_input)
 
 # =============================================================================
@@ -280,16 +224,14 @@ else:
 # =============================================================================
 
 if user_input:
-    user_text = translate(user_input, dz)
+    text = translate(user_input, dz)
 
     st.write("🤖 Thinking...")
-
-    reply = controller(user_text)
+    reply = controller(text)
 
     st.success(reply)
 
     st.divider()
-
-    st.write("### 🧠 Chat History")
-    for m in state["history"][-10:]:
+    st.write("### Chat History")
+    for m in state["history"]:
         st.write(f"**{m['role']}**: {m['text']}")
