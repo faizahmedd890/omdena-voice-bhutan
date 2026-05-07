@@ -23,16 +23,17 @@ load_dotenv()
 # =============================================================================
 
 SYSTEM_PROMPT = """
-You are a STRICT Bhutan Business Registration assistant.
+You are a strict assistant representing Bhutanese Government Services.
 
 RULES:
-- Answer ONLY about Bhutan business registration, licensing, documents, and tax.
+- Answer ONLY about Bhutanese government services (including business registration, licensing, documents, citizen services, and tax).
+- If the user asks an unrelated question, politely refuse.
 - By default, give SHORT, CLEAR answers (max 6–8 lines).
 - If the user explicitly asks for a detailed or long explanation, you may provide a longer answer.
-- If the user asks an unrelated question, politely refuse.
+- If the user greets you (e.g., 'hi', 'hello'), greet them back simply. Do NOT provide lists or examples of services.
 - Ask ONLY ONE question at a time in the workflow.
 - NEVER repeat questions already answered.
-- Use conversation history as memory.
+- Use the provided full conversation history to remember previous turns and context.
 - Do NOT restart the workflow unless the user types 'restart'.
 - Always reply in English.
 - The user may give input in English or Dzongkha. Dzongkha input will be translated to English before reaching you.
@@ -86,7 +87,7 @@ print("⏳ Loading RAG...")
 _embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
 _vectordb = Chroma(persist_directory="chroma_db", embedding_function=_embeddings)
 _retriever = _vectordb.as_retriever(search_kwargs={"k": 4})
-_llm = ChatMistralAI()
+_llm = ChatMistralAI(model="open-mistral-7b")
 
 _prompt = ChatPromptTemplate.from_messages([
     ("system", SYSTEM_PROMPT),
@@ -119,7 +120,7 @@ class ConversationState:
 
     def format_history(self):
         lines = []
-        for m in self.history[-12:]:
+        for m in self.history:
             r = "User" if m["role"] == "user" else "Assistant"
             lines.append(f"{r}: {m['text']}")
         return "\n".join(lines)
@@ -133,13 +134,16 @@ def rag_answer(state: ConversationState, question: str) -> str:
     context = retrieve_context(question)
     history = state.format_history()
 
-    res = _chain.invoke({
-        "context": context,
-        "history": history,
-        "question": question
-    })
-
-    ans = res.content.strip()
+    try:
+        res = _chain.invoke({
+            "context": context,
+            "history": history,
+            "question": question
+        })
+        ans = res.content.strip()
+    except Exception as e:
+        ans = f"⚠️ Error: I'm currently unable to process requests due to a service error ({e}). Please try again later."
+        
     state.add("ai", ans)
     return ans
 

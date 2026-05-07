@@ -3,6 +3,19 @@ import os
 import numpy as np
 import sounddevice as sd
 import whisper
+import imageio_ffmpeg
+import shutil
+
+ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+ffmpeg_dir = os.path.dirname(ffmpeg_exe)
+ffmpeg_symlink = os.path.join(ffmpeg_dir, "ffmpeg.exe")
+if not os.path.exists(ffmpeg_symlink):
+    try:
+        shutil.copy(ffmpeg_exe, ffmpeg_symlink)
+    except Exception:
+        pass
+os.environ["PATH"] += os.pathsep + ffmpeg_dir
+
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator   # ✅ changed
 
@@ -63,7 +76,7 @@ db = Chroma(
 retriever = db.as_retriever(search_kwargs={"k": 4})
 
 # ===================== LLM =====================
-llm = ChatMistralAI()
+llm = ChatMistralAI(model="open-mistral-7b")
 
 # ===================== PROMPT =====================
 prompt = ChatPromptTemplate.from_messages([
@@ -102,12 +115,14 @@ def ask_rag(question):
     context = "\n\n".join([doc.page_content for doc in docs])
 
     chain = prompt | llm
-    response = chain.invoke({
-        "context": context,
-        "question": question
-    })
-
-    return response.content
+    try:
+        response = chain.invoke({
+            "context": context,
+            "question": question
+        })
+        return response.content
+    except Exception as e:
+        return f"⚠️ Error: I'm currently unable to process requests due to a service error ({e}). Please try again later."
 
 
 # ===================== MAIN LOOP =====================
