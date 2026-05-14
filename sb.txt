@@ -10,3 +10,7 @@ CREATE TABLE chats (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 and run
+
+4. In vs code run database.py file
+5. Then u can run c8sud2.py 
+6. Then run streamfinal.py  
