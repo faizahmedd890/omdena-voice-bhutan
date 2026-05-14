@@ -1,0 +1,12 @@
+1. Create account in supabase
+2. Add url and its api in .env file vs code.
+3. Then add this query in SQL editor
+
+CREATE TABLE chats (
+    id BIGSERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+and run
